@@ -11,9 +11,9 @@ class Block(object):
       imu_ang_deg=imu_ang_deg-360
     else:
       pass
-
+    print(imu_ang_deg)
     v_x   = (ball_dis * math.sin(math.radians(ball_ang))) * math.sin(math.radians(imu_ang_deg))
     v_y   = (ball_dis * math.sin(math.radians(ball_ang))) * math.cos(math.radians(imu_ang_deg))
-    v_yaw = -imu_ang_deg
-
+    v_yaw = -imu_ang
+    print(v_yaw)
     return v_x, v_y, v_yaw

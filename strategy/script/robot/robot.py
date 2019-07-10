@@ -51,13 +51,13 @@ class Robot(object):
   __maximum_v = 0
   __handle_dis = 0
   __handle_ang = 0
-  Kp_v = 0.0
+  Kp_v = 1.5
   Ki_v = 0.0
-  Kd_v = 0.0
+  Kd_v = 0.1
   Cp_v = 0
-  Kp_w = 0.0
+  Kp_w = 0.25
   Ki_w = 0.0
-  Kd_w = 0.0
+  Kd_w = 0.1
   Cp_w = 0
 
   pid_v = PID(Kp_v, Ki_v, Kd_v, setpoint=Cp_v)
@@ -188,7 +188,6 @@ class Robot(object):
       output_v = self.pid_v(current_vector * -1)
       output_w = self.pid_w(yaw) * -1
       output_w = output_w if abs(output_w) > self.__minimum_w else self.__minimum_w* np.sign(output_w)
-
       magnitude = math.sqrt(x**2 + y**2)
       if magnitude == 0:
         unit_vector = (0, 0)
@@ -202,6 +201,7 @@ class Robot(object):
       msg.linear.y   = output_y
       msg.angular.z  = output_w
       self.cmdvel_pub.publish(msg)
+
 
   def GetObjectInfo(self):
     return self.__object_info
