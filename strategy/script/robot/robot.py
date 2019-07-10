@@ -6,10 +6,12 @@ from simple_pid import PID
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Twist
 from vision.msg import Object
+from vision.msg import Two_point
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from std_msgs.msg import String
 from std_msgs.msg import Int32
 from std_msgs.msg import Bool 
+from imu_3d.msg import inertia
 
 ## Rotate 90 for 6th robot
 ## DO NOT CHANGE THIS VALUE
@@ -20,18 +22,21 @@ VISION_TOPIC = "vision/object"
 CMDVEL_TOPIC = "motion/cmd_vel"
 SHOOT_TOPIC  = "motion/shoot"
 POSITION_TOPIC = "akf_pose"
-
+IMU            = "imu_3d"
 ## Strategy Outputs
 STRATEGY_STATE_TOPIC = "robot{}/strategy/state"
 
 class Robot(object):
 
   __robot_info = {'location' : {'x' : 0, 'y' : 0, 'yaw' : 0}}
-  __object_info = {'ball':{'dis' : 0, 'ang' : 0},
-                   'Blue':{'dis' : 0, 'ang' : 0},
-                   'Yellow':{'dis' : 0, 'ang' : 0},
+  __object_info = {'ball':{'dis' : 0, 'ang' : 0 ,'right' : 0 ,'left' : 0},
+                   'Blue':{'dis' : 0, 'ang' : 0,'right' : 0 ,'left' : 0},
+                   'Yellow':{'dis' : 0, 'ang' : 0,'right' : 0 ,'left' : 0},
                    'velocity' : 0 }
   __ball_is_handled = False
+  __twopoint_info = {'Blue':{'right' : 0,'left' : 0},
+                     'Yellow':{'right' : 0,'left' : 0}}
+  __imu_info = {'imu':{'ang' : 0}} 
   ## Configs
   __minimum_w = 0
   __maximum_w = 0
@@ -91,6 +96,8 @@ class Robot(object):
     self.shoot_pub  = self._Publisher(SHOOT_TOPIC, Int32)
 
     if not sim :
+      rospy.Subscriber('/interface/Two_point', Two_point, self._GetTwopoint)
+      rospy.Subscriber(IMU,inertia,self._GetImu)
       self.RobotBallHandle = self.RealBallHandle
     else:
       self.RobotBallHandle = self.SimBallHandle
@@ -101,14 +108,24 @@ class Robot(object):
   def _Publisher(self, topic, mtype):
     return rospy.Publisher(topic, mtype, queue_size=1)
 
+
   def _GetVision(self, vision):
-    self.__object_info['ball']['dis']    = vision.ball_dis
-    self.__object_info['ball']['ang']    = vision.ball_ang
-    self.__object_info['Blue']['dis']    = vision.blue_fix_dis
-    self.__object_info['Blue']['ang']    = vision.blue_fix_ang
-    self.__object_info['Yellow']['dis']  = vision.yellow_fix_dis
-    self.__object_info['Yellow']['ang']  = vision.yellow_fix_ang
-  
+    self.__object_info['ball']['dis']     = vision.ball_dis
+    self.__object_info['ball']['ang']     = vision.ball_ang
+    self.__object_info['Blue']['dis']     = vision.blue_fix_dis
+    self.__object_info['Blue']['ang']     = vision.blue_fix_ang
+    self.__object_info['Yellow']['dis']   = vision.yellow_fix_dis
+    self.__object_info['Yellow']['ang']   = vision.yellow_fix_ang
+    
+  def _GetTwopoint(self,vision):
+    self.__twopoint_info['Blue']['right']   = vision.blue_right
+    self.__twopoint_info['Blue']['left']    = vision.blue_left
+    self.__twopoint_info['Yellow']['right'] = vision.yellow_right
+    self.__twopoint_info['Yellow']['left']  = vision.yellow_left   
+
+  def _GetImu(self,imu_3d):
+    self.__imu_info['imu']['ang']    = imu_3d.yaw
+
   def _GetPosition(self,loc):
     self.__robot_info['location']['x'] = loc.pose.pose.position.x*100
     self.__robot_info['location']['y'] = loc.pose.pose.position.y*100
@@ -142,7 +159,6 @@ class Robot(object):
       output_v = self.pid_v(current_vector * -1)
       output_w = self.pid_w(yaw) * -1
       output_w = output_w if abs(output_w) > self.__minimum_w else self.__minimum_w* np.sign(output_w)
-
       magnitude = math.sqrt(x**2 + y**2)
       if magnitude == 0:
         unit_vector = (0, 0)
@@ -157,11 +173,18 @@ class Robot(object):
       msg.angular.z  = output_w
       self.cmdvel_pub.publish(msg)
 
+
   def GetObjectInfo(self):
     return self.__object_info
 
   def GetRobotInfo(self):
     return self.__robot_info
+ 
+  def GetTwopoint(self):
+    return self.__twopoint_info
+
+  def GetImu(self):
+    return self.__imu_info
 
   def RealShoot(self, power, pos) :
     msg = Int32()
